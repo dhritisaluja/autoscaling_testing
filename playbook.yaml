@@ -1,7 +1,7 @@
 ---
 - name: Play for Install Nginx on WebServers
   hosts: localhost
-  connection: local         # <--- added this line
+  connection: local
   gather_facts: yes
   vars:
     custom_heading: "Welcome To Autoscaling Testing by Saikiran Pinapathruni"
@@ -9,38 +9,60 @@
     host_name: "{{ ansible_facts['hostname'] }}"
     fqdn_name: "{{ ansible_facts['fqdn'] }}"
     ip_address: "{{ ansible_default_ipv4.address }}"
+    os_version: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+  
   tasks:
-    - name: Run Apt Update
-      shell: apt update && apt install -y python3-apt
+    - name: Update package cache and install python3-apt
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+        name: python3-apt
+        state: present
 
     - name: Install Nginx Server
       apt:
         name: nginx
         state: present
 
+    - name: Ensure nginx service is enabled and started
+      systemd:
+        name: nginx
+        enabled: yes
+        state: started
+
     - name: Copy the files to index destination folder
       template:
         src: /myrepo/index.j2
         dest: /var/www/html/index.nginx-debian.html
-        owner: root
-        group: root
+        owner: www-data
+        group: www-data
         mode: 0644
 
     - name: Copy the style files to destination folder
       copy:
         src: /myrepo/style.css
         dest: /var/www/html/style.css
-        owner: root
-        group: root
+        owner: www-data
+        group: www-data
         mode: 0644
 
     - name: Copy the javascript files to destination folder
       copy:
         src: /myrepo/scorekeeper.js
         dest: /var/www/html/scorekeeper.js
+        owner: www-data
+        group: www-data
+        mode: 0644
+
+    - name: Create app.conf from template
+      template:
+        src: /myrepo/app.conf.j2
+        dest: /etc/app.conf
         owner: root
         group: root
         mode: 0644
 
-    - name: Restart Nginx
-      command: service nginx restart
+    - name: Restart Nginx to apply changes
+      systemd:
+        name: nginx
+        state: restarted
